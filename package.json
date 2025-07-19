@@ -1,7 +1,7 @@
 {
   "name": "cofounder-webhook2",
   "version": "1.0.0",
-  "description": "Webhook server to receive Lovable responses and forward them to Make.com",
+  "description": "Webhook server to receive Lovable AI responses and send them to Make",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
