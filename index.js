@@ -7,7 +7,7 @@ app.use(express.json());
 
 app.post('/webhook', async (req, res) => {
   console.log('Received webhook from Lovable:', req.body);
-  
+
   try {
     const response = await fetch('https://webhook.site/2781be55-118f-4362-99b8-7a6d97ae50cb', {
       method: 'POST',
@@ -28,9 +28,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
