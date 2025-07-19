@@ -9,7 +9,9 @@ app.post('/webhook', async (req, res) => {
   console.log('Received webhook from Lovable:', req.body);
   
   try {
-    const response = await fetch('https://hook.us2.make.com/50o6wnkj8a3gikoqsr42odvsa5o4ntu4', {
+    const response = await fetch('https://webhook.site/2781be55-118f-4362-99b8-7a6d97ae50cb
+Copy to clipboard
+', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body),
