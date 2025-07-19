@@ -1,30 +1,36 @@
 const express = require('express');
-const fetch = require('node-fetch');
+const axios = require('axios');
+const bodyParser = require('body-parser');
+
 const app = express();
+app.use(bodyParser.json());
 
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/your_make_webhook_here'; // replace with actual Make webhook
 
-// When Lovable sends a response here
-app.post('/webhook', async (req, res) => {
-  console.log('Received response from Lovable:', req.body);
+app.post('/', async (req, res) => {
+  const incomingMessage = req.body.message;
 
   try {
-    // Forward to Make's Webhook
-    await fetch('https://hook.us2.make.com/50o6wnkj8a3gikoqsr42odvsa5o4ntu4', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
+    const lovableResponse = await axios.post('https://info-reply-bot.lovable.app/webhook', {
+      message: incomingMessage
     });
 
-    res.status(200).send('Forwarded to Make!');
+    const aiReply = lovableResponse.data.message;
+
+    // Forward Lovable's reply to Make.com webhook
+    await axios.post(MAKE_WEBHOOK_URL, {
+      message: aiReply
+    });
+
+    res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Error:', err);
-    res.status(500).send('Something went wrong');
+    console.error(err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Webhook2 listening on port ${port}`);
 });
+
