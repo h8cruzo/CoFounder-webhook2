@@ -1,36 +1,48 @@
 const express = require('express');
-const axios = require('axios');
-const bodyParser = require('body-parser');
-
+const fetch = require('node-fetch'); // v2, CommonJS
 const app = express();
-app.use(bodyParser.json());
 
-const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/your_make_webhook_here'; // replace with actual Make webhook
+app.use(express.json());
 
-app.post('/', async (req, res) => {
-  const incomingMessage = req.body.message;
+// quick health check
+app.get('/', (_req, res) => res.send('ok'));
 
+// proxy -> Lovable -> return clean JSON
+app.post('/webhook', async (req, res) => {
   try {
-    const lovableResponse = await axios.post('https://info-reply-bot.lovable.app/webhook', {
-      message: incomingMessage
+    // support both {message:"..."} and Twilio's Body field if you ever send it directly
+    const userMessage =
+      req.body?.message ?? req.body?.Body ?? req.body?.body ?? '';
+
+    // 👉 Lovable preview webhook URL (from the Webhook API tab)
+    const lovableResp = await fetch('https://info-reply-bot.lovable.app/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: userMessage })
     });
 
-    const aiReply = lovableResponse.data.message;
+    // try JSON first; if Lovable ever returns HTML, keep it in raw
+    let parsed;
+    try {
+      parsed = await lovableResp.json();
+    } catch (_) {
+      parsed = { raw: await lovableResp.text() };
+    }
 
-    // Forward Lovable's reply to Make.com webhook
-    await axios.post(MAKE_WEBHOOK_URL, {
-      message: aiReply
+    const aiMessage =
+      parsed?.message ?? parsed?.reply ?? parsed?.text ?? '';
+
+    return res.json({
+      success: true,
+      message: aiMessage,
+      raw: parsed,                 // handy for debugging in Railway logs
+      timestamp: new Date().toISOString()
     });
-
-    res.status(200).json({ success: true });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ success: false, error: err.message });
+    console.error('webhook2 error:', err);
+    return res.status(500).json({ success: false, error: String(err) });
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Webhook2 listening on port ${port}`);
-});
-
+const PORT = process.env.PORT || 8080; // Railway defaults to 8080
+app.listen(PORT, () => console.log(`webhook2 listening on ${PORT}`));
