@@ -1,82 +1,58 @@
-const express = require('express');
-const fetch = require('node-fetch');
-
+const express = require("express");
+const fetch = require("node-fetch"); // v2 (CommonJS)
 const app = express();
+
+// Set this in Railway → Project → Variables
+const LOVABLE_WEBHOOK_URL = process.env.LOVABLE_WEBHOOK_URL;
+
 app.use(express.json());
 
-// health
-app.get('/', (_req, res) => res.send('ok'));
+// Health check
+app.get("/", (_req, res) => res.status(200).send("ok"));
 
-// helpful GET response so it doesn't look like an error if you visit /webhook
-app.get('/webhook', (_req, res) => res.status(405).send('Use POST /webhook'));
-
-app.post('/webhook', async (req, res) => {
+// POST endpoint Make.com will call
+app.post("/webhook", async (req, res) => {
   try {
-    const { message } = req.body || {};
-    if (!message) return res.status(400).json({ success:false, error:'Missing "message"' });
+    if (!LOVABLE_WEBHOOK_URL) {
+      return res
+        .status(500)
+        .json({ error: "LOVABLE_WEBHOOK_URL env var is not set" });
+    }
 
-    // Send to Lovable’s webhook URL
-    const lovable = await fetch('https://info-reply-bot.lovable.app/webhook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const { message } = req.body || {};
+    if (typeof message !== "string" || !message.trim()) {
+      return res.status(400).json({ error: 'Body must include "message" string' });
+    }
+
+    // Forward to Lovable’s webhook
+    const forward = await fetch(LOVABLE_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message })
     });
 
-    // Expect Lovable returns JSON: { success, message, ... }
-    const data = await lovable.json();
+    // Try to parse Lovable response safely
+    const ct = forward.headers.get("content-type") || "";
+    let data;
+    if (ct.includes("application/json")) {
+      data = await forward.json();
+    } else {
+      const text = await forward.text();
+      try { data = JSON.parse(text); } catch { data = { message: text }; }
+    }
 
-    // Normalize what we return to Make
-    return res.json({
-      success: true,
-      message: data.message || '',
-      raw: data
-    });
+    // Normalize what we return to Make.com
+    const aiMsg =
+      (data && (data.message || data.reply || data.text)) ||
+      (typeof data === "string" ? data : "");
+
+    return res.status(200).json({ message: aiMsg });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success:false, error: String(err) });
+    console.error("Proxy error:", err);
+    return res.status(502).json({ error: "Proxy error", detail: String(err?.message || err) });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('webhook2 listening on', PORT));
-const express = require('express');
-const fetch = require('node-fetch');
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`webhook2 listening on ${PORT}`));
 
-const app = express();
-app.use(express.json());
-
-// health
-app.get('/', (_req, res) => res.send('ok'));
-
-// helpful GET response so it doesn't look like an error if you visit /webhook
-app.get('/webhook', (_req, res) => res.status(405).send('Use POST /webhook'));
-
-app.post('/webhook', async (req, res) => {
-  try {
-    const { message } = req.body || {};
-    if (!message) return res.status(400).json({ success:false, error:'Missing "message"' });
-
-    // Send to Lovable’s webhook URL
-    const lovable = await fetch('https://info-reply-bot.lovable.app/webhook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
-    });
-
-    // Expect Lovable returns JSON: { success, message, ... }
-    const data = await lovable.json();
-
-    // Normalize what we return to Make
-    return res.json({
-      success: true,
-      message: data.message || '',
-      raw: data
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success:false, error: String(err) });
-  }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('webhook2 listening on', PORT));
